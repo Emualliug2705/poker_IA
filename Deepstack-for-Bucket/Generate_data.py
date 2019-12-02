@@ -41,6 +41,7 @@ class Gen_data(Cmatrix):
         self.flower = card_to_string.suit_table[:settings.suit_count]
         self.all_cards = [i+j for i in self.card for j in self.flower]
         self.all_hands_dict_to_can = None
+        print('{} for a total cards of {} cards'.format(self.all_cards, len(self.all_cards)))
 
     '''Cluster center point save file name'''
     def get_savename(self):
