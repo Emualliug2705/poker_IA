@@ -3,8 +3,8 @@ from __future__ import division
 import gc
 import copy
 from tqdm import tqdm
-from ..pypokertools.isomorph import *
-from ..pypokertools.pokertools import *
+from isomorph import *
+from pokertools import *
 from Cluster_data import *
 from card_to_string_conversion import CARD_TO_STRING
 from judging import judging
