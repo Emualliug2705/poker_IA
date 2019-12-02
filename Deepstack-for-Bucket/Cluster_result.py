@@ -503,7 +503,7 @@ def cluster_result_main(street):
 
 
 if __name__ == "__main__":
-    STREET = 'flop'
-    cluster_result = CLUSTER_RESULT(street=STREET, file_path='data/', turn_sample_count=20,river_sample_count=10, opponent_sample_count=20,
-                                    comb_flag=True, normalize_flag=True)
-    cluster_result.computer_cluster_result()
+    for s in ['flop', 'turn', 'river']:
+        cluster_result = CLUSTER_RESULT(street=s, file_path='data/', turn_sample_count=20,river_sample_count=10, opponent_sample_count=20,
+                                        comb_flag=True, normalize_flag=True)
+        cluster_result.computer_cluster_result()
