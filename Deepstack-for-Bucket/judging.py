@@ -1,9 +1,8 @@
 # -*- coding:utf-8 -*-
-from deuces import *
 import argparse
 import random
-from deuces.evaluator import *
-from deuces.card import *
+from evaluator import *
+from card import *
 EV = Evaluator()
 
 
@@ -470,10 +469,6 @@ def main():
          100 * round((totals[2] / (iterations + 0.0)), 4))
           )
 
-from pypokerengine.engine.hand_evaluator import HandEvaluator
-from pypokerengine.players import BasePokerPlayer
-from pypokerengine.utils.card_utils import _pick_unused_card, _fill_community_card, gen_cards
-from pypokerengine.utils.card_utils import gen_cards, estimate_hole_card_win_rate
 
 #
 # Main Program Body
