@@ -1,0 +1,246 @@
+"""
+neuron poker
+
+Usage:
+  main.py random [options]
+  main.py keypress [options]
+  main.py consider_equity [options]
+  main.py equity_improvement --improvement_rounds=<> [options]
+  main.py dqn_train [options]
+  main.py dqn_play [options]
+
+options:
+  -h --help         Show this screen.
+  -r --render       render screen
+  --log             log file
+  --screenloglevel  log level on screen
+  --episodes=<>     number of episodes to play
+
+"""
+
+import logging
+
+import numpy as np
+import pandas as pd
+from docopt import docopt
+
+import gym
+from agents.agent_consider_equity import Player as EquityPlayer
+from agents.agent_dqn import Player as DQNPlayer
+from agents.agent_mccfr import Player as MCCFR_Player
+from agents.agent_keypress import Player as KeyPressAgent
+from agents.agent_random import Player as RandomPlayer
+from gym_env.env import PlayerShell
+from tools.helper import get_config
+from tools.helper import init_logger
+
+
+def command_line_parser():
+    """Entry function"""
+    args = docopt(__doc__)
+    if args['--log']:
+        logfile = args['--log']
+    else:
+        print("Using default log file")
+        logfile = 'default'
+    screenloglevel = logging.INFO if not args['--screenloglevel'] else \
+        getattr(logging, args['--screenloglevel'].upper())
+    _ = get_config()
+
+    init_logger(screenlevel=screenloglevel, filename=logfile)
+    print(f"Screenloglevel: {screenloglevel}")
+    log = logging.getLogger("")
+    # log.setLevel("CRITICAL")
+    log.info("Initializing program")
+
+    num_episodes = 1 if not args['--episodes'] else int(args['--episodes'])
+    runner = Runner(render=args['--render'], num_episodes=num_episodes)
+
+    if args['random']:
+        # runner.random_agents()
+        runner.mccfr_train()
+        # runner.random_agents()
+
+    elif args['keypress']:
+        runner.key_press_agents()
+
+    elif args['consider_equity']:
+        runner.equity_vs_random()
+
+    elif args['equity_improvement']:
+        improvement_rounds = int(args['--improvement_rounds'])
+        runner.equity_self_improvement(improvement_rounds)
+
+    elif args['dqn_train']:
+        runner.dqn_train()
+
+    elif args['dqn_play']:
+        runner.dqn_play()
+
+    else:
+        raise RuntimeError("Argument not yet implemented")
+
+
+class Runner:
+    """Orchestration"""
+
+    def __init__(self, render, num_episodes):
+        """Initialize"""
+        self.winner_in_episodes = []
+        self.render = render
+        self.env = None
+        self.num_episodes = num_episodes
+        self.log = logging.getLogger(__name__)
+
+    def random_agents(self):
+        """Create an environment with 6 random players"""
+        env_name = 'neuron_poker-v0'
+        stack = 20
+        num_of_plrs = 2
+        self.env = gym.make(env_name, num_of_players=num_of_plrs, initial_stacks=stack, render=self.render)
+        for _ in range(num_of_plrs):
+            player = RandomPlayer()
+            self.env.add_player(player)
+        self.env.reset()
+
+    def key_press_agents(self):
+        """Create an environment with 6 key press agents"""
+        env_name = 'neuron_poker-v0'
+        stack = 500
+        num_of_plrs = 6
+        self.env = gym.make(env_name, num_of_players=num_of_plrs, initial_stacks=stack, render=self.render)
+        for _ in range(num_of_plrs):
+            player = KeyPressAgent()
+            self.env.add_player(player)
+
+        self.env.reset()
+
+    def equity_vs_random(self):
+        """Create 6 players, 4 of them equity based, 2 of them random"""
+        env_name = 'neuron_poker-v0'
+        stack = 500
+        num_of_plrs = 6
+        self.env = gym.make(env_name, num_of_players=num_of_plrs, initial_stacks=stack, render=self.render)
+        self.env.add_player(EquityPlayer(name='equity/50/50', min_call_equity=.5, min_bet_equity=-.5))
+        self.env.add_player(EquityPlayer(name='equity/50/80', min_call_equity=.8, min_bet_equity=-.8))
+        self.env.add_player(EquityPlayer(name='equity/70/70', min_call_equity=.7, min_bet_equity=-.7))
+        self.env.add_player(EquityPlayer(name='equity/20/30', min_call_equity=.2, min_bet_equity=-.3))
+        self.env.add_player(RandomPlayer())
+        self.env.add_player(RandomPlayer())
+
+        for _ in range(self.num_episodes):
+            self.env.reset()
+            self.winner_in_episodes.append(self.env.winner_ix)
+
+        league_table = pd.Series(self.winner_in_episodes).value_counts()
+        best_player = league_table.index[0]
+
+        print(league_table)
+        print(f"Best Player: {best_player}")
+
+    def equity_self_improvement(self, improvement_rounds):
+        """Create 6 players, 4 of them equity based, 2 of them random"""
+        calling = [.1, .2, .3, .4, .5, .6]
+        betting = [.2, .3, .4, .5, .6, .7]
+
+        for improvement_round in range(improvement_rounds):
+            env_name = 'neuron_poker-v0'
+            stack = 500
+            self.env = gym.make(env_name, num_of_players=5, initial_stacks=stack, render=self.render)
+            for i in range(6):
+                self.env.add_player(EquityPlayer(name=f'Equity/{calling[i]}/{betting[i]}',
+                                                 min_call_equity=calling[i],
+                                                 min_bet_equity=betting[i]))
+
+            for _ in range(self.num_episodes):
+                self.env.reset()
+                self.winner_in_episodes.append(self.env.winner_ix)
+
+            league_table = pd.Series(self.winner_in_episodes).value_counts()
+            best_player = int(league_table.index[0])
+            print(league_table)
+            print(f"Best Player: {best_player}")
+
+            # self improve:
+            self.log.info(f"Self improvment round {improvement_round}")
+            for i in range(6):
+                calling[i] = np.mean([calling[i], calling[best_player]])
+                self.log.info(f"New calling for player {i} is {calling[i]}")
+                betting[i] = np.mean([betting[i], betting[best_player]])
+                self.log.info(f"New betting for player {i} is {betting[i]}")
+
+    @staticmethod
+    def dqn_train():
+        """Implementation of kreras-rl deep q learing."""
+        env_name = 'neuron_poker-v0'
+        stack = 100
+        env = gym.make(env_name, num_of_players=2, initial_stacks=stack, funds_plot=False)
+
+        np.random.seed(123)
+        env.seed(123)
+#         env.add_player(EquityPlayer(name='equity/50/70', min_call_equity=.5, min_bet_equity=.7))
+#         env.add_player(EquityPlayer(name='equity/20/30', min_call_equity=.2, min_bet_equity=-.3))
+        env.add_player(PlayerShell(name='keras-r3', stack_size=stack))  # shell is used for callback to keras rl
+        env.add_player(PlayerShell(name='keras-r4', stack_size=stack))  # shell is used for callback to keras rl
+#        env.add_player(PlayerShell(name='keras-r5', stack_size=stack))  # shell is used for callback to keras rl
+#        env.add_player(PlayerShell(name='keras-r6', stack_size=stack))  # shell is used for callback to keras rl
+
+        env.reset()
+
+        dqn = DQNPlayer()
+        dqn.initiate_agent(env)
+        dqn.train(env_name='dqn1')
+
+    def dqn_play(self):
+        """Create 6 players, one of them a trained DQN"""
+        env_name = 'neuron_poker-v0'
+        stack = 500
+        num_of_plrs = 6
+        self.env = gym.make(env_name, num_of_players=num_of_plrs, initial_stacks=stack, render=self.render)
+        self.env.add_player(EquityPlayer(name='equity/50/50', min_call_equity=.5, min_bet_equity=.5))
+        self.env.add_player(EquityPlayer(name='equity/50/80', min_call_equity=.8, min_bet_equity=.8))
+        self.env.add_player(EquityPlayer(name='equity/70/70', min_call_equity=.7, min_bet_equity=.7))
+        self.env.add_player(EquityPlayer(name='equity/20/30', min_call_equity=.2, min_bet_equity=.3))
+        self.env.add_player(RandomPlayer())
+        self.env.add_player(PlayerShell(name='keras-rl', stack_size=stack))
+
+        self.env.reset()
+
+        dqn = DQNPlayer(load_model='dqn1', env=self.env)
+        dqn.play(nb_episodes=self.num_episodes, render=self.render)
+
+    def mccfr_train(self):
+        """Implementation of kreras-rl deep q learing."""
+        env_name = 'neuron_poker-v0'
+        stack = 500
+        num_of_plrs = 2
+
+        self.env = gym.make(env_name, num_of_players=num_of_plrs,
+                            initial_stacks=stack,
+                            small_blind=2,
+                            big_blind=8,
+                            funds_plot=False,
+                            render=self.render)
+
+        np.random.seed(123)
+        self.env.seed(123)
+
+        for _ in range(num_of_plrs):
+            player = RandomPlayer()
+            self.env.add_player(player)
+
+        mccfr = MCCFR_Player()
+        mccfr.initiate_agent(self.env)
+        mccfr.train(it=40000000, burn_lcfr=0.3)
+
+
+if __name__ == '__main__':
+    command_line_parser()
+
+    """
+    import gamegym
+    g = gamegym.games.OneCardPoker()
+
+    mc = gamegym.algorithms.OutcomeMCCFR(g, seed=52)
+    mc.compute(40000000)
+    """
