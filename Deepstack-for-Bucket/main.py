@@ -5,7 +5,7 @@ from Cluster_result import *
 # Generate data
 for s in ['river', 'turn', 'flop']:
     data = Gen_data(street=s, file_path=settings.file_path)
-    data.generate_data(heuristic=settings.dict_heuristic)
+    data.generate_data(heuristic=settings.dict_heuristic[s])
     cluster_data_main(street=s, cluster_k=settings.dict_clusters[s])
 
 # Generate results
