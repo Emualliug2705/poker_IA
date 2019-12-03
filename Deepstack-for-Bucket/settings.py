@@ -1,10 +1,10 @@
 # -*- coding:utf-8 -*-
 
 ''' The number of hand suit'''
-suit_count = 2
+suit_count = 4
 
 ''' The number of rank suit'''
-rank_count = 6
+rank_count = 13
 
 ''' Directory to write results'''
 file_path = 'data/'
