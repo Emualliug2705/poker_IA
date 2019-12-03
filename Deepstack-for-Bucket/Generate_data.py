@@ -41,6 +41,7 @@ class Gen_data(Cmatrix):
         self.flower = card_to_string.suit_table[:settings.suit_count]
         self.all_cards = [i+j for i in self.card for j in self.flower]
         self.all_hands_dict_to_can = None
+        print('{} for a total cards of {} cards'.format(self.all_cards, len(self.all_cards)))
 
     '''Cluster center point save file name'''
     def get_savename(self):
@@ -73,12 +74,12 @@ class Gen_data(Cmatrix):
         play = 0
         f = open(self.savename, 'wt')
 
-        all_state = combinations(self.all_cards, 7)
+        all_state = tuple(combinations(self.all_cards, 7))
         # all_state = list(map(list, combinations(self.all_cards, 7)))
         # all_state = generate_permutations(7, self.card, self.flower)
         # all_state = get_all_canonicals(self.all_cards, 7)
         for state in tqdm(all_state, desc='{}'.format(self.street)):
-            all_hand = list(combinations(state, 2))
+            all_hand = tuple(combinations(state, 2))
             if heuristic:
                 all_hand_can_p = set([self.all_hands_dict_to_can[' '.join(h)] for h in all_hand])
             else:
@@ -108,7 +109,7 @@ class Gen_data(Cmatrix):
                                               if len(set(h.split(' ')).intersection(public_card)) == 0\
                                               and len(set(h.split(' ')).intersection(can_hand)) == 0]
                 else:
-                    all_hands_can_opponent = list(map(list, combinations(free_cards, 2)))
+                    all_hands_can_opponent = list(combinations(free_cards, 2))
 
                 if len(all_hands_can_opponent) == 0:
                     skipped += 1
